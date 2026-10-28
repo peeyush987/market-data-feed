@@ -19,6 +19,7 @@ public:
 
 private:
     std::unordered_map<std::uint64_t, SimulatedOrder> activeOrders_;
+    std::uint64_t nextExpectedSequence_ = 1;
 };
 
 } // namespace market

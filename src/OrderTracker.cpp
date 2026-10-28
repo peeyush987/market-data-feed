@@ -4,13 +4,19 @@
 namespace market {
 
 bool OrderTracker::apply(const MarketEvent& event) {
+    // Reject events that are not next in the feed sequence.
+    if (event.sequence != nextExpectedSequence_) {
+        return false;
+    }
+
+    bool applied = false;
+
     switch (event.type) {
     case EventType::Add: {
-        // Reject invalid IDs, prices, and quantities.
         if (event.orderId == 0 ||
             event.priceTicks <= 0 ||
             event.quantity == 0) {
-            return false;
+            break;
         }
 
         SimulatedOrder order;
@@ -19,93 +25,91 @@ bool OrderTracker::apply(const MarketEvent& event) {
         order.priceTicks = event.priceTicks;
         order.remainingQuantity = event.quantity;
 
-        // emplace does not replace an existing order.
-        return activeOrders_.emplace(
+        applied = activeOrders_.emplace(
             event.orderId, order
         ).second;
+        break;
     }
 
     case EventType::Cancel: {
         if (event.orderId == 0) {
-            return false;
+            break;
         }
 
-        // erase returns 1 if an order was removed, 0 otherwise.
-        return activeOrders_.erase(event.orderId) == 1;
+        applied = activeOrders_.erase(event.orderId) == 1;
+        break;
     }
 
     case EventType::Modify: {
         if (event.orderId == 0 ||
             event.priceTicks <= 0 ||
             event.quantity == 0) {
-            return false;
+            break;
         }
 
         auto it = activeOrders_.find(event.orderId);
 
         if (it == activeOrders_.end()) {
-            return false;
+            break;
         }
 
-        // Update only after validation succeeds.
-        it->second.priceTicks = event.priceTicks;
         it->second.remainingQuantity = event.quantity;
-        it->second.side = event.side;
-
-        return true;
+        applied = true;
+        break;
     }
 
     case EventType::Trade: {
         if (event.orderId == 0 ||
-            event.relatedOrderId == 0 ||
-            event.orderId == event.relatedOrderId ||
-            event.quantity == 0) {
-            return false;
+            event.quantity == 0 ||
+            event.priceTicks <= 0) {
+            break;
         }
 
         auto restingIt = activeOrders_.find(event.orderId);
-        auto incomingIt =
-            activeOrders_.find(event.relatedOrderId);
 
-        if (restingIt == activeOrders_.end() ||
-            incomingIt == activeOrders_.end()) {
-            return false;
+        if (restingIt == activeOrders_.end()) {
+            break;
         }
 
         SimulatedOrder& resting = restingIt->second;
-        SimulatedOrder& incoming = incomingIt->second;
 
-        // A trade must involve opposite sides.
-        if (resting.side == incoming.side) {
-            return false;
+        if (event.side != resting.side) {
+            break;
         }
 
-        // Neither order may trade more than its remaining quantity.
-        if (event.quantity > resting.remainingQuantity ||
-            event.quantity > incoming.remainingQuantity) {
-            return false;
+        if (resting.side == Side::Buy &&
+            event.priceTicks > resting.priceTicks) {
+            break;
         }
 
-        // Both orders have been validated; now apply the trade.
+        if (resting.side == Side::Sell &&
+            event.priceTicks < resting.priceTicks) {
+            break;
+        }
+
+        if (event.quantity > resting.remainingQuantity) {
+            break;
+        }
+
         resting.remainingQuantity -= event.quantity;
-        incoming.remainingQuantity -= event.quantity;
 
-        // Remove fully filled orders.
         if (resting.remainingQuantity == 0) {
             activeOrders_.erase(restingIt);
         }
 
-        if (incoming.remainingQuantity == 0) {
-            activeOrders_.erase(incomingIt);
-        }
-
-        return true;
+        applied = true;
+        break;
     }
     }
 
-    // Defensive fallback for an invalid EventType value.
-    return false;
+    // Consume the sequence only after a successful state update.
+    if (applied) {
+        ++nextExpectedSequence_;
+    }
+
+    return applied;
 }
+
 
 bool OrderTracker::contains(std::uint64_t orderId) const {
     return activeOrders_.find(orderId) != activeOrders_.end();
