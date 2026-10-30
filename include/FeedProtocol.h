@@ -26,7 +26,7 @@ enum class WireSide : std::uint8_t {
 
 using EncodedMessage = std::array<std::uint8_t, MESSAGE_SIZE>;
 
-void writeU64BE(
+bool writeU64BE(
     EncodedMessage& message,
     std::size_t offset,
     std::uint64_t value
