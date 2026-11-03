@@ -32,6 +32,17 @@ bool writeU64BE(
     std::uint64_t value
 );
 
+bool writeU32BE(
+    EncodedMessage& message,
+    std::size_t offset,
+    std::uint32_t value
+);
+
+bool encode(
+    const MarketEvent& event,
+    EncodedMessage& output
+);
+
 } // namespace market::protocol
 
 #endif
