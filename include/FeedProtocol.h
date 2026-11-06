@@ -43,6 +43,27 @@ bool encode(
     EncodedMessage& output
 );
 
+bool decode(
+    const std::uint8_t* data,
+    std::size_t length,
+    MarketEvent& output
+);
+
+bool readU64BE(
+    const std::uint8_t* data,
+    std::size_t length,
+    std::size_t offset,
+    std::uint64_t& value
+);
+
+bool readU32BE(
+    const std::uint8_t* data,
+    std::size_t length,
+    std::size_t offset,
+    std::uint32_t& value
+);
+
+
 } // namespace market::protocol
 
 #endif
