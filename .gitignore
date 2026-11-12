@@ -1,3 +1,8 @@
-# Generated test executables
-test_event
+# Compiled executables
+test_udp_pipeline
+test_udp_receiver
 test_protocol
+test_event
+
+# Object files
+*.o
